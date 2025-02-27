@@ -1,79 +1,121 @@
 import pygame
-import sys
 
 # Initialize Pygame
 pygame.init()
 
-# Set up display
-WIDTH, HEIGHT = 900, 500
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+# Get full screen size
+info = pygame.display.Info()
+WIDTH, HEIGHT = info.current_w, info.current_h  # Match screen size
+
+# Set up fullscreen display
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Speakeasy")
 
-# Load and scale background
+# Load images
 background = pygame.image.load("/Users/charlotteeverhart/Downloads/speakeasy.jpg")
-background = pygame.transform.scale(background, (WIDTH, HEIGHT))
+overlay = pygame.image.load("grid.png")
+victim = pygame.image.load("victimbodypic.jpg")
 
+# Get original background dimensions
+bg_width, bg_height = background.get_size()
 
-# Define sprite class
-class OverlaySprite(pygame.sprite.Sprite):
-    def __init__(self, image_path, x, y):
-        super().__init__()
-        self.image = pygame.image.load(image_path)  # Load the image
-        self.image = pygame.transform.scale(self.image, (500, 500))  # Scale the sprite
-        self.rect = self.image.get_rect()  # Get the rectangle for positioning
-        self.rect.topleft = (x, y)  # Set initial position
-        self.y_velocity = 0
-        self.gravity = 0.5
-        self.jump_strength = -10
-        self.on_ground = False
+# Calculate the best scale factor to fill the entire screen
+scale_factor = max(WIDTH / bg_width, HEIGHT / bg_height)
 
-    def update(self, keys, background_width, background_height):
-        # Move left and right
-        if keys[pygame.K_LEFT]:
-            self.rect.x -= 2
-        if keys[pygame.K_RIGHT]:
-            self.rect.x += 2
+# New scaled width and height for background
+new_width = int(bg_width * scale_factor)
+new_height = int(bg_height * scale_factor)
 
-        # Jumping logic
-        if self.on_ground and keys[pygame.K_SPACE]:
-            self.y_velocity = self.jump_strength
-            self.on_ground = False
+# Resize background while keeping proportions
+background = pygame.transform.smoothscale(background, (new_width, new_height))
 
-        self.y_velocity += self.gravity  # Apply gravity
-        self.rect.y += self.y_velocity
+startScreen = pygame.transform.smoothscale(victim, (new_width,new_height))
 
-        # Boundary checking
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > background_width:
-            self.rect.right = background_width
+# Calculate position to crop (center the image)
+x_offset = (new_width - WIDTH) // 2
+y_offset = (new_height - HEIGHT) // 2
 
-        # Ground collision
-        if self.rect.bottom >= background_height:
-            self.rect.bottom = background_height
-            self.y_velocity = 0
-            self.on_ground = True
+# Resize overlay image
+overlay = pygame.transform.scale(overlay, (500, 500))  # Resize overlay image
 
-# Create sprite
-overlay = OverlaySprite("/Users/charlotteeverhart/Downloads/IMG_3847.PNG", 0, 0)
-overlay2=OverlaySprite("/Users/charlotteeverhart/Desktop/grid.png", 0, 0)
-all_sprites = pygame.sprite.Group(overlay, overlay2)
+# Position overlay in bottom-right corner
+overlay_x = WIDTH - overlay.get_width()
+overlay_y = HEIGHT - overlay.get_height()
 
+# Define exit button properties
+button_color = (200, 0, 0)  # Red button
+button_hover_color = (255, 50, 50)  # Lighter red on hover
+button_rect = pygame.Rect(WIDTH - 120, 20, 100, 50)  # Position top-right
+font = pygame.font.Font(None, 36)  # Button text font
+button_text = font.render("EXIT", True, (255, 255, 255))  # White text
+
+# Define Start screen button properties
+start_button_rect = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 25, 200, 50)  # Centered button
+start_button_text = font.render("START", True, (255, 255, 255))  # Start button text
+
+# Game loop flag
+game_started = False
+
+# Start screen loop
+while not game_started:
+    screen.blit(startScreen, (-x_offset, -y_offset))  # Fill the screen with black (start screen background)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            exit()
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            # Check if Start button is clicked
+            if start_button_rect.collidepoint(pygame.mouse.get_pos()):
+                game_started = True  # Start the game
+
+    # Draw Start screen title
+    title_font = pygame.font.Font(None, 72)
+    title_text = title_font.render("Welcome to Speakeasy", True, (0, 0, 0))
+    screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 4))
+
+    # Draw Start button
+    if start_button_rect.collidepoint(pygame.mouse.get_pos()):
+        pygame.draw.rect(screen, button_hover_color, start_button_rect)  # Hover color
+    else:
+        pygame.draw.rect(screen, button_color, start_button_rect)  # Normal button color
+
+    # Draw "START" text on the button
+    screen.blit(start_button_text, (start_button_rect.x + 60, start_button_rect.y + 10))
+
+    # Update the display
+    pygame.display.flip()
+
+# Main game loop (after Start button is clicked)
 running = True
 while running:
-    keys = pygame.key.get_pressed()
+    mouse_x, mouse_y = pygame.mouse.get_pos()  # Get mouse position
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            if button_rect.collidepoint(mouse_x, mouse_y):  # Check if clicked
+                running = False  # Exit the game
 
+    # Draw background (centered)
+    screen.blit(background, (-x_offset, -y_offset))
 
-    all_sprites.update(keys, WIDTH, HEIGHT)
+    # Draw overlay image in bottom-right
+    screen.blit(overlay, (overlay_x, overlay_y))
 
-    # Redraw the screen
-    screen.blit(background, (0, 0))
-    all_sprites.draw(screen)
+    # Check if mouse is over the exit button
+    if button_rect.collidepoint(mouse_x, mouse_y):
+        pygame.draw.rect(screen, button_hover_color, button_rect)  # Highlight button
+    else:
+        pygame.draw.rect(screen, button_color, button_rect)  # Normal button
+
+    # Draw button text
+    screen.blit(button_text, (button_rect.x + 25, button_rect.y + 10))
+
+    # Update the display
     pygame.display.flip()
-
 
 pygame.quit()
